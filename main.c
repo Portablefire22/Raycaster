@@ -6,6 +6,7 @@
 #include <SDL2/SDL_stdinc.h>
 #include <SDL2/SDL_surface.h>
 #include <SDL2/SDL_video.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,7 @@ const int SCREEN_WIDTH = 1920;
 const uint8_t map[6][8] = {
     {1,1,1,1,1,1,1,1},
     {1,0,0,0,0,0,0,1},
-    {1,0,1,1,1,1,0,1},
+    {1,0,0,1,1,1,0,1},
     {1,0,0,0,0,1,0,1},
     {1,0,0,1,0,0,0,1},
     {1,1,1,1,1,1,1,1}
@@ -34,6 +35,11 @@ typedef struct EntityStruct {
     int msize; // Mini-map Size
     Uint32 col; // Entity colour
 } entity;
+
+struct RayHit {
+    float distance;
+    int wall_height;
+};
 
 struct {
     SDL_Window* window;
@@ -107,6 +113,59 @@ void free_entities() {
     }
 }
 
+struct RayHit cast_ray(float ray_angle) {
+    float px = engine.current_player->px;
+    float py = engine.current_player->py;
+    
+    float dx = cos(ray_angle);
+    float dy = sin(ray_angle);
+
+    int i = 0;
+    printf("%f\n", engine.current_player->px);
+    while (map[(int) floor(py)][(int) floor(px)] == 0) {
+        px += dx * 0.1;
+        py += dy * 0.1;
+        i++;
+        if (i > 400) break; 
+    }
+    printf("d%f\n", px);
+
+    const float distance = sqrt(pow((px - engine.current_player->px), 2.0) + pow((py - engine.current_player->py), 2.0));
+    const int wall_height = (int) floor(300.0 / distance);
+    struct RayHit info;
+    info.distance = distance;
+    info.wall_height = wall_height;
+    return info;
+}
+
+void draw_wall_slice(int i, struct RayHit* info, int slice_width) {
+    for (int j=0; j < info->wall_height; j++) {
+        int yPos = floor(300 - info->wall_height / 2 + j);
+
+        SDL_Rect* temp_rect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
+        temp_rect->x = i * slice_width;
+        temp_rect->y = yPos;
+        temp_rect->w = slice_width;
+        temp_rect->h = 1;
+        SDL_FillRect(engine.screen_surface, temp_rect, 0xff00ff);
+
+        free(temp_rect);
+    }
+}
+
+void raycast() {
+    const int rays = 200;
+    const int slice_width = (int) (SCREEN_WIDTH / rays);
+    const int angle_step = 60 / rays;
+
+    // Walls
+    for (int i=0; i < rays; i++) {
+        const float ray_angle = engine.current_player->pr - (60/2) + i * angle_step;
+        struct RayHit ray_info = cast_ray(ray_angle);
+        draw_wall_slice(i, &ray_info, slice_width);
+    }
+}
+
 int main(int argc, char* args[]) {
     
     if (init() == -1) {
@@ -119,14 +178,9 @@ int main(int argc, char* args[]) {
     entity* player = (entity*)malloc(sizeof(entity));
     player->msize = 10;
     player->col = 0xff00ff;
-    player->pr = player->px = player->py = 0.0;
+    player->px = player->py = 3.0;
     add_entity(player);
     
-    entity* p2 = (entity*)malloc(sizeof(entity));
-    p2->msize = 20;
-    p2->col = 0xffff00;
-    p2->pr = p2->px = p2->py = 40.0;
-    add_entity(p2);
 
     engine.current_player = player;
     
@@ -149,16 +203,22 @@ int main(int argc, char* args[]) {
                 case SDL_KEYDOWN:
                     switch (e.key.keysym.sym) {
                         case SDLK_LEFT:
+                            engine.current_player->pr -= 0.1;
                             break;
                         case SDLK_RIGHT:
+                            engine.current_player->pr += 0.1;
                             break;
                         case SDLK_UP:
+                            engine.current_player->px++;
                             break;
                         case SDLK_DOWN:
+                            engine.current_player->py++;
                             break;
                     }
             }
         }
+        SDL_FillRect(engine.screen_surface, NULL, SDL_MapRGB(engine.screen_surface->format, 0xff, 0xff, 0xff));
+        raycast();
         draw_minimap();
         SDL_UpdateWindowSurface(engine.window);
     }
