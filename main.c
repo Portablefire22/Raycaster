@@ -17,13 +17,27 @@
 
 #define PI 3145
 
-const uint8_t map[6][8] = {
-    {1,1,1,1,1,1,1,1},
-    {1,0,0,0,0,0,0,1},
-    {1,0,0,1,1,1,0,1},
-    {1,0,0,0,0,1,0,1},
-    {1,0,0,1,0,0,0,1},
-    {1,1,1,1,1,1,1,1}
+const uint8_t map[20][20] = {
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,1,1,1,0,1,1,1,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},
 };
 
 const int MAP_WIDTH = (int) (sizeof(map[0])/sizeof(map[0][0]));
@@ -43,6 +57,8 @@ struct RayHit {
     float distance;
     int wall_height;
 };
+
+int x = 1;
 
 struct {
     SDL_Window* window;
@@ -84,10 +100,20 @@ int init() {
     return 0;
 }
 
+void draw_minimap_back() {
+    SDL_SetRenderDrawColor(engine.renderer, 0xfA, 0xfA, 0xfA, 0xff);
+    SDL_Rect* rect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
+    rect->h = MAP_HEIGHT * MINIMAP_BLOCK_SIZE;
+    rect->w = MAP_WIDTH * MINIMAP_BLOCK_SIZE;
+    rect->x = 0;
+    rect->y = 0;
+    SDL_RenderFillRect(engine.renderer, rect);
+}
+
 void draw_minimap() {
     int cx = 0;
     int cy = 0;
-    SDL_SetRenderDrawColor(engine.renderer, 0x0A, 0x0A, 0x0A, 0xff);
+    SDL_SetRenderDrawColor(engine.renderer, 0x00, 0x00, 0x00, 0xff);
     for (int i=0; i < (int)(sizeof(map)/sizeof(map[0][0])); i++) {
         if (map[cy / MINIMAP_BLOCK_SIZE][cx / MINIMAP_BLOCK_SIZE]) {
             SDL_Rect* block = (SDL_Rect*)malloc(sizeof(SDL_Rect));
@@ -113,7 +139,8 @@ void draw_minimap() {
         box->y = ce->py;
         SDL_SetRenderDrawColor(engine.renderer, (ce->col >> 16) & 0xff, (ce->col >> 8) & 0xff, ce->col & 0xff, 0xff);
         SDL_RenderFillRect(engine.renderer, box);
-        SDL_SetRenderDrawColor(engine.renderer, 0x00, 0xf0, 0xf0, 0xff);
+
+        SDL_SetRenderDrawColor(engine.renderer, 0x0f, 0xf0, 0xf0, 0xff);
         int ty = (float)(ce->py + ce->msize / 2) + sin(ce->pr / 1000.0) * 50;
         int tx = (float)(ce->px + ce->msize / 2) + cos(ce->pr / 1000.0) * 50;
         SDL_RenderDrawLine(engine.renderer, ce->px + ce->msize / 2 , ce->py + ce->msize / 2, tx, ty);
@@ -136,24 +163,27 @@ void free_entities() {
     }
 }
 
-/*struct RayHit cast_ray(float ray_angle) {
-    float px = engine.current_player->px;
-    float py = engine.current_player->py;
+struct RayHit cast_ray(float ray_angle) {
+    float px = engine.current_player->px / MINIMAP_BLOCK_SIZE;
+    float py = engine.current_player->py / MINIMAP_BLOCK_SIZE;
     
     float dx = cos(ray_angle);
     float dy = sin(ray_angle);
 
     int i = 0;
-    printf("%f\n", engine.current_player->px);
     while (map[(int) floor(py)][(int) floor(px)] == 0) {
         px += dx * 0.1;
         py += dy * 0.1;
         i++;
         if (i > 400) break; 
     }
-    printf("d%f\n", px);
+   
+    const float distance = sqrt(pow((px - engine.current_player->px / MINIMAP_BLOCK_SIZE), 2.0) + pow((py - engine.current_player->py / MINIMAP_BLOCK_SIZE), 2.0));
+    
+    /*SDL_SetRenderDrawColor(engine.renderer, 0xff, 0x00, 0x00, 0xff);
+    entity* ce = engine.current_player;
+    SDL_RenderDrawLine(engine.renderer, ce->px + ce->msize / 2 , ce->py + ce->msize / 2, px * MINIMAP_BLOCK_SIZE, py * MINIMAP_BLOCK_SIZE);*/
 
-    const float distance = sqrt(pow((px - engine.current_player->px), 2.0) + pow((py - engine.current_player->py), 2.0));
     const int wall_height = (int) floor(300.0 / distance);
     struct RayHit info;
     info.distance = distance;
@@ -163,31 +193,53 @@ void free_entities() {
 
 void draw_wall_slice(int i, struct RayHit* info, int slice_width) {
     for (int j=0; j < info->wall_height; j++) {
-        int yPos = floor(300 - info->wall_height / 2 + j);
+        Uint32 col = floor((float)0xfa / (1.0 + info->distance / 4.0));
+        SDL_SetRenderDrawColor(engine.renderer, col , 0x00, col, 0xff);
+        int yPos = floor((SCREEN_HEIGHT / 2)- info->wall_height / 2.0 + j);
 
         SDL_Rect* temp_rect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
         temp_rect->x = i * slice_width;
         temp_rect->y = yPos;
         temp_rect->w = slice_width;
         temp_rect->h = 1;
-        SDL_FillRect(engine.screen_surface, temp_rect, 0xff00ff);
+        SDL_RenderFillRect(engine.renderer, temp_rect);
 
         free(temp_rect);
     }
+    SDL_SetRenderDrawColor(engine.renderer, 0xff, 0xff, 0xff, 0xff);
 }
 
 void raycast() {
-    const int rays = 200;
-    const int slice_width = (int) (SCREEN_WIDTH / rays);
-    const int angle_step = 60 / rays;
+    SDL_SetRenderDrawColor(engine.renderer, 0x0d, 0x00, 0x0d, 0xff);
+     SDL_Rect* temp_rect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
+        temp_rect->x = 0;
+        temp_rect->y = 0;
+        temp_rect->w = SCREEN_WIDTH;
+        temp_rect->h = SCREEN_HEIGHT / 2;
+        SDL_RenderFillRect(engine.renderer, temp_rect);
+    free(temp_rect);
+    SDL_SetRenderDrawColor(engine.renderer, 0xAE, 0x00, 0xAE, 0xff);
+    temp_rect = (SDL_Rect*)malloc(sizeof(SDL_Rect));
+        temp_rect->x = 0;
+        temp_rect->y = SCREEN_HEIGHT / 2;
+        temp_rect->w = SCREEN_WIDTH;
+        temp_rect->h = SCREEN_HEIGHT / 2;
+        SDL_RenderFillRect(engine.renderer, temp_rect);
 
+    free(temp_rect);
+
+    const int rays = 1919;
+    const int slice_width = (int) (SCREEN_WIDTH / rays);
+    const float angle_step = (PI / 4000.0) / (float)rays;
+
+    //draw_minimap_back();
     // Walls
     for (int i=0; i < rays; i++) {
-        const float ray_angle = engine.current_player->pr - (60/2) + i * angle_step;
+        const float ray_angle = (engine.current_player->pr / 1000.0) - ((PI/4000.0)/2.0) + i * angle_step;
         struct RayHit ray_info = cast_ray(ray_angle);
         draw_wall_slice(i, &ray_info, slice_width);
     }
-}*/
+}
 
 int main(int argc, char* args[]) {
     
@@ -201,7 +253,7 @@ int main(int argc, char* args[]) {
     entity* player = (entity*)malloc(sizeof(entity));
     player->msize = 10;
     player->col = 0xff00ff;
-    player->px = player->py = 3.0;
+    player->px = player->py = 1.5 * MINIMAP_BLOCK_SIZE;
     player->pr = PI;
     add_entity(player);
     
@@ -239,9 +291,9 @@ int main(int argc, char* args[]) {
             }
         }
         SDL_RenderClear(engine.renderer);
-        
         SDL_RenderCopy(engine.renderer, engine.texture, NULL, NULL); // Render texture
-        draw_minimap();
+        raycast();
+        //draw_minimap();
         SDL_RenderPresent(engine.renderer);
     }
         
